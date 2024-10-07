@@ -4,7 +4,7 @@ import ytdl from "@distube/ytdl-core"
 import path from "path"
 import url from "url"
 import clipboardy from "clipboardy"
-import { dirs } from "./index.js"
+import { dirs, failedFilePath, failedVids } from "./index.js"
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegPath from 'ffmpeg-static'
 
@@ -19,75 +19,71 @@ export function validName(name) {
 
 export function sizeInMB(bytes) {
 	const mbs = bytes / 1024 / 1024
-	// console.log(mbs)
-	if (mbs>10){
-	return Math.ceil(mbs).toString()
-	} else if (mbs>1){
-		return parseFloat(mbs.toFixed(1))
-	} else {
-		return parseFloat(mbs.toFixed(3))
-	}
+	return mbs>10? Math.ceil(mbs): parseFloat(mbs.toFixed(1))
 }
-// const bytes = 784593
-// console.log(bytes)
-// console.log(sizeInMB(bytes))
 
 export function listFormat(format, type, index) {
 	let string = ""
-	const fps = (format.fps||"**").toString() + " fps"
+	const fps = (format.fps||"**").toString() + "fps"
 	const size = sizeInMB(format.contentLength)
 	const quality = format.qualityLabel
 	if (type == "video") {
-		string += `${(index.toString()+'.').padEnd(3)} ${(size+' MB').padEnd(6)} ${quality.padEnd(7)}  ${fps.padEnd(7)} `
+		string += `${(index.toString()+'.').padEnd(3)} ${(size+' MB').padEnd(9)} ${quality.padEnd(6)} ${fps.padEnd(6)} `
 	} else if (type == "audio") {
 		const abitrate = format.audioBitrate.toString() + " kb/s"
-		string += ` | ${(index.toString()+'.').padEnd(3)} ${(size+' MB').padEnd(6)} ${abitrate.padEnd(9)}`
+		string += `${(index.toString()+'.').padEnd(3)} ${(size+' MB').padEnd(8)} ${abitrate.padEnd(9)}`
 	} else if (type == "full") {
 		const abitrate = format.audioBitrate.toString() + " kb/s"
-		string += ` | ${(index.toString()+'.').padEnd(3)} ${(size+' MB').padEnd(6)} ${quality.padEnd(6)} ${abitrate.padEnd(9)} ${fps.padEnd(7)}`
+		string += `${(index.toString()+'.').padEnd(3)} ${(size+' MB').padEnd(8)} ${quality.padEnd(6)} ${abitrate.padEnd(9)} ${fps.padEnd(7)}`
 	}
 	return string  + ' .' + format.container.padEnd(5, ' ')
 }
 
-export async function getInfo(url) {
-	let vidID = getID(url)
+export async function getInfo(vidID) {
+	// let vidID = getID(url)
 	let jsonFile
-	fs.readdirSync(dirs.dataDir).forEach((e) => {
+	fs.readdirSync(dirs.v_data).forEach((e) => {
 		if (e.includes(vidID)) {
-			jsonFile = path.join(dirs.dataDir, e)
+			jsonFile = path.join(dirs.v_data, e)
 		}
 	})
 	try {
-		console.log("-> Searchign For Database...")
+		// console.log("-> Searchign For Database...")
 		if (!jsonFile) {
 			throw new Error("-> No Database!")
 		}
-		console.log("-> Reading DataBase...")
+		// console.log("-> Reading DataBase...")
 		const infoString = fs.readFileSync(jsonFile)
 		var info = await JSON.parse(infoString)
-		console.log("-> Database is ready.")
+		// console.log("-> Database is ready.")
 	} catch (error) {
 		console.log(error.message)
-		console.log("-> Getting data from YouTube.")
-		var info = await ytdl.getInfo(url)
+		// console.log("-> Getting data from YouTube.")
+		var info = await ytdl.getInfo(vidID)
 		const author = validName(info.videoDetails.author.name)
 		const title =
 			validName(info.videoDetails.title) + " -(" + author + ") " + vidID + " "
 		console.log("-> vidId:", vidID)
 		console.log("-> Title:", title)
-		console.log("-> Saving Database.")
-		fs.writeFile(
-			path.join(dirs.dataDir, title) + ".json",
-			JSON.stringify(info),
+		// failedObj[vidID]
+		saveJSON(info, title)
+		
+	}
+	return info
+}
+
+export function saveJSON(jsonObj, title){
+	fs.writeFile(
+			path.join(dirs.v_data, title) + ".json",
+			JSON.stringify(jsonObj),
 			(err) => {
 				if (err) {
 					console.log(err)
 				}
-				console.log(`-> Info was written.`)
 			}
 		)
-	}
-	return info
+		
+		
 }
 
 function distictFormatsFromBasicInfo(formats) {
@@ -148,6 +144,7 @@ export function merge(videoPath, audioPath){
 		.on('error', (err) => {
 			console.error('Error: ', err);
 		});
+	return outPath
 }
 
 function countElements(arr) {
@@ -188,3 +185,6 @@ function check_itag(){
 		})
 	})
 }
+
+
+// console.log(new Date()+ 60*60*1000*2)
